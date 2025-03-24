@@ -10,7 +10,7 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
     />
     <script>
-      document.addEventListener("DOMContentLoaded", () => {
+      document.addEventListener("DOMContentLoaded", async () => {
         const formElements = document.querySelectorAll(
           "input, textarea, select"
         );
@@ -35,150 +35,75 @@
           }
         });
 
-        function updateAside() {
-          document.getElementById("aside-first-name").textContent =
-            document.getElementById("first-name").value || "FIRST NAME";
-          document.getElementById("aside-surname").textContent =
-            document.getElementById("surname").value || "SURNAME";
-          document.getElementById("aside-city").textContent =
-            document.getElementById("city").value || "City";
-          document.getElementById("aside-phone").textContent =
-            document.getElementById("phone").value || "Phone";
-          document.getElementById("aside-email").textContent =
-            document.getElementById("email").value || "Email";
-          document.getElementById("aside-summary").textContent =
-            document.getElementById("summary").value || "Summary";
-          document.getElementById("aside-skills").textContent =
-            document.getElementById("skills").value || "Skills";
-          document.getElementById("aside-experience").textContent =
-            document.getElementById("experience").value || "Experience";
-          document.getElementById("aside-education").textContent =
-            document.getElementById("education").value || "Education";
+        const userEmail = localStorage.getItem("userEmail");
+        if (!userEmail) {
+          console.error("No user email found in localStorage.");
+          return;
         }
 
-        // Handle form submission with PDF generation
-        const form = document.getElementById("cv-form");
-        form.addEventListener("submit", async function (e) {
-          e.preventDefault();
+        // Fetching the resume data for the logged-in user
+        try {
+          const response = await fetch(
+            `http://localhost:5001/getResume?userEmail=${userEmail}`
+          );
+          if (response.ok) {
+            const resumeData = await response.json();
 
-          // Show loading indicator
-          const submitBtn = document.getElementById("submit-btn");
-          const originalBtnText = submitBtn.textContent;
-          submitBtn.textContent = "Generating PDF...";
-          submitBtn.disabled = true;
+            // Populating the form with the fetched resume data
+            document.getElementById("first-name").value =
+              resumeData.firstname || "";
+            document.getElementById("surname").value = resumeData.surname || "";
+            document.getElementById("city").value = resumeData.city || "";
+            document.getElementById("postal-code").value =
+              resumeData.postalcode || "";
+            document.getElementById("country").value = resumeData.country || "";
+            document.getElementById("phone").value = resumeData.phone || "";
+            document.getElementById("email").value = resumeData.email || "";
+            document.getElementById("summary").value = resumeData.summary || "";
+            document.getElementById("skills").value = resumeData.skills || "";
+            document.getElementById("experience").value =
+              resumeData.experience || "";
+            document.getElementById("education").value =
+              resumeData.education || "";
 
-          // Also show status message
-          const statusMsg = document.getElementById("status-message");
-          statusMsg.textContent = "Generating your CV, please wait...";
-          statusMsg.className = "mt-4 p-2 bg-blue-100 text-blue-700 rounded";
-          statusMsg.style.display = "block";
-
-          try {
-            // Collect form data
-            const formData = {
-              firstName: document.getElementById("first-name").value,
-              surname: document.getElementById("surname").value,
-              city: document.getElementById("city").value,
-              postalCode: document.getElementById("postal-code").value,
-              country: document.getElementById("country").value,
-              phone: document.getElementById("phone").value,
-              email: document.getElementById("email").value,
-              summary: document.getElementById("summary").value,
-              skills: document.getElementById("skills").value,
-              experience: document.getElementById("experience").value,
-              education: document.getElementById("education").value,
-              photo: photoBase64,
-            };
-
-            console.log("Sending PDF generation request...");
-            console.log(formData);
-
-            // FIXED: Explicitly use the correct server URL instead of assuming it's the same origin
-            // Your server is running on port 5001, not on the same port as your frontend
-            const serverUrl = "http://localhost:5001";
-
-            // Send data to backend
-            // This code goes in the form submit event listener in your frontend JavaScript
-            // Replace the PDF handling section with this improved version:
-
-            // Send data to backend
-            const response = await fetch(`${serverUrl}/generate-pdf`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(formData),
-            });
-
-            console.log("Response status:", response.status);
-
-            if (response.ok) {
-              try {
-                // Convert the response to a blob
-                const blob = await response.blob();
-                console.log("Received blob:", blob, "Type:", blob.type);
-
-                // Make sure we got a PDF
-                if (blob.type !== "application/pdf") {
-                  console.error("Received non-PDF response:", blob.type);
-                  throw new Error("Server did not return a PDF file");
-                }
-
-                // Create a URL for the blob
-                const url = window.URL.createObjectURL(blob);
-                console.log("Created blob URL:", url);
-
-                // Create a temporary link and trigger download
-                const a = document.createElement("a");
-                a.style.display = "none";
-                a.href = url;
-                a.download = `cv_${formData.firstName}_${formData.surname}.pdf`;
-                document.body.appendChild(a);
-
-                console.log("Triggering download...");
-                a.click();
-
-                // Small delay before cleanup
-                setTimeout(() => {
-                  window.URL.revokeObjectURL(url);
-                  document.body.removeChild(a);
-                  console.log("Download cleanup complete");
-                }, 100);
-
-                // Show success message
-                statusMsg.textContent =
-                  "Your CV has been generated and downloaded successfully!";
-                statusMsg.className =
-                  "mt-4 p-2 bg-green-100 text-green-700 rounded";
-              } catch (err) {
-                console.error("Error processing PDF download:", err);
-                throw new Error(`PDF download failed: ${err.message}`);
-              }
-            } else {
-              // Error handling code remains the same
-
-              // Try to get error details
-              let errorDetails = "Unknown error";
-              try {
-                const errorJson = await response.json();
-                errorDetails = errorJson.message || errorDetails;
-              } catch (e) {
-                console.error("Could not parse error response:", e);
-              }
-
-              throw new Error(`Failed to generate PDF: ${errorDetails}`);
+            // If you want to set the photo preview (if saved)
+            const photoPreview = document.getElementById("photo-preview");
+            if (resumeData.photo) {
+              photoPreview.src = resumeData.photo; // You should store the image URL or path in the database
             }
-          } catch (error) {
-            console.error("Error generating PDF:", error);
-            statusMsg.textContent = `Error: ${error.message}`;
-            statusMsg.className = "mt-4 p-2 bg-red-100 text-red-700 rounded";
-          } finally {
-            // Reset button state
-            submitBtn.textContent = originalBtnText;
-            submitBtn.disabled = false;
+
+            // Update aside sections too
+            updateAside();
+          } else {
+            console.error("Failed to fetch resume data:", response.status);
           }
-        });
+        } catch (error) {
+          console.error("Error fetching resume data:", error);
+        }
       });
+
+      function updateAside() {
+        clearTimeout(saveTimeout); // Clear previous timer
+        saveTimeout = setTimeout(saveResumeData, 1000);
+        document.getElementById("aside-first-name").textContent =
+          document.getElementById("first-name").value || "FIRST NAME";
+        document.getElementById("aside-surname").textContent =
+          document.getElementById("surname").value || "SURNAME";
+        document.getElementById("aside-city").textContent =
+          document.getElementById("city").value || "City";
+        document.getElementById("aside-phone").textContent =
+          document.getElementById("phone").value || "Phone";
+        document.getElementById("aside-email").textContent =
+          document.getElementById("email").value || "Email";
+        document.getElementById("aside-summary").textContent =
+          document.getElementById("summary").value || "Summary";
+        document.getElementById("aside-skills").textContent =
+          document.getElementById("skills").value || "Skills";
+        document.getElementById("aside-experience").textContent =
+          document.getElementById("experience").value || "Experience";
+        document.getElementById("aside-education").textContent =
+          document.getElementById("education").value || "Education";
+      }
     </script>
   </head>
   <body class="bg-gray-100">
@@ -246,7 +171,6 @@
                 type="text"
                 id="postal-code"
                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                required
               />
             </div>
             <div>
@@ -258,7 +182,6 @@
               <select
                 id="country"
                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                required
               >
                 <option value="" disabled selected>Select a country</option>
                 <option value="Bangladesh">Bangladesh</option>
@@ -380,7 +303,7 @@
           <div class="mb-4 flex justify-end">
             <img
               id="photo-preview"
-              class="w-32 h-40 object-cover border-2 border-gray-400 rounded-md"
+              class="w-40 h-40 object-cover border-2 border-gray-400 rounded-full"
               alt="Passport Photo"
               style="display: none"
             />
@@ -418,5 +341,195 @@
         </div>
       </div>
     </div>
+    <script>
+      let saveTimeout;
+      document.addEventListener("DOMContentLoaded", async () => {
+        const formElements = document.querySelectorAll(
+          "input, textarea, select"
+        );
+        formElements.forEach((element) => {
+          element.addEventListener("input", updateAside);
+        });
+
+        const photoInput = document.getElementById("photo");
+        const photoPreview = document.getElementById("photo-preview");
+        let photoBase64 = null;
+
+        photoInput.addEventListener("change", function () {
+          const file = this.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+              photoPreview.src = event.target.result;
+              photoBase64 = event.target.result; // Store the base64 data
+              photoPreview.style.display = "block"; // Show the preview
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+
+        const userEmail = localStorage.getItem("userEmail");
+        if (!userEmail) {
+          console.error("No user email found in localStorage.");
+          return;
+        }
+
+        // Handle form submission with PDF generation
+        const form = document.getElementById("cv-form");
+        form.addEventListener("submit", async function (e) {
+          // Show loading indicator
+          const submitBtn = document.getElementById("submit-btn");
+          const originalBtnText = submitBtn.textContent;
+          submitBtn.textContent = "Generating PDF...";
+          submitBtn.disabled = true;
+
+          // Also show status message
+          const statusMsg = document.getElementById("status-message");
+          statusMsg.textContent = "Generating your CV, please wait...";
+          statusMsg.className = "mt-4 p-2 bg-blue-100 text-blue-700 rounded";
+          statusMsg.style.display = "block";
+
+          try {
+            // Collect form data
+            const formData = {
+              firstName: document.getElementById("first-name").value,
+              surname: document.getElementById("surname").value,
+              city: document.getElementById("city").value,
+              postalCode: document.getElementById("postal-code").value || "",
+              country: document.getElementById("country").value || "",
+              phone: document.getElementById("phone").value,
+              email: document.getElementById("email").value,
+              summary: document.getElementById("summary").value,
+              skills: document.getElementById("skills").value,
+              experience: document.getElementById("experience").value,
+              education: document.getElementById("education").value,
+              photo: photoBase64,
+            };
+
+            console.log("Sending PDF generation request...");
+            console.log(formData);
+
+            // FIXED: Explicitly use the correct server URL instead of assuming it's the same origin
+            // Your server is running on port 5001, not on the same port as your frontend
+            const serverUrl = "http://localhost:5001";
+
+            // Send data to backend
+            // This code goes in the form submit event listener in your frontend JavaScript
+            // Replace the PDF handling section with this improved version:
+
+            // Send data to backend
+            const response = await fetch(`${serverUrl}/generate-pdf`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(formData),
+            });
+
+            console.log("Response status:", response.status);
+
+            if (response.ok) {
+              try {
+                // Convert the response to a blob
+                const blob = await response.blob();
+                console.log("Received blob:", blob, "Type:", blob.type);
+
+                // Make sure we got a PDF
+                if (blob.type !== "application/pdf") {
+                  console.error("Received non-PDF response:", blob.type);
+                  throw new Error("Server did not return a PDF file");
+                }
+
+                // Create a URL for the blob
+                const url = window.URL.createObjectURL(blob);
+                console.log("Created blob URL:", url);
+
+                // Create a temporary link and trigger download
+                const a = document.createElement("a");
+                a.style.display = "none";
+                a.href = url;
+                a.download = `cv_${formData.firstName}_${formData.surname}.pdf`;
+                document.body.appendChild(a);
+
+                console.log("Triggering download...");
+                a.click();
+
+                // Small delay before cleanup
+                setTimeout(() => {
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                  console.log("Download cleanup complete");
+                }, 100);
+
+                // Show success message
+                statusMsg.textContent =
+                  "Your CV has been generated and downloaded successfully!";
+                statusMsg.className =
+                  "mt-4 p-2 bg-green-100 text-green-700 rounded";
+              } catch (err) {
+                console.error("Error processing PDF download:", err);
+                throw new Error(`PDF download failed: ${err.message}`);
+              }
+            } else {
+              // Error handling code remains the same
+
+              // Try to get error details
+              let errorDetails = "Unknown error";
+              try {
+                const errorJson = await response.json();
+                errorDetails = errorJson.message || errorDetails;
+              } catch (e) {
+                console.error("Could not parse error response:", e);
+              }
+
+              throw new Error(`Failed to generate PDF: ${errorDetails}`);
+            }
+          } catch (error) {
+            console.error("Error generating PDF:", error);
+            statusMsg.textContent = `Error: ${error.message}`;
+            statusMsg.className = "mt-4 p-2 bg-red-100 text-red-700 rounded";
+          } finally {
+            // Reset button state
+            submitBtn.textContent = originalBtnText;
+            submitBtn.disabled = false;
+          }
+        });
+      });
+      async function saveResumeData() {
+        const userEmail = localStorage.getItem("userEmail");
+        if (!userEmail) return;
+
+        // Collecting all the form values into an object
+        const resumeData = {
+          email: userEmail,
+          firstname: document.getElementById("first-name").value,
+          surname: document.getElementById("surname").value,
+          city: document.getElementById("city").value,
+          postalCode: document.getElementById("postal-code").value,
+          country: document.getElementById("country").value,
+          phone: document.getElementById("phone").value,
+          summary: document.getElementById("summary").value,
+          skills: document.getElementById("skills").value,
+          experience: document.getElementById("experience").value,
+          education: document.getElementById("education").value,
+        };
+
+        console.log("Saving resume data:", resumeData);
+
+        try {
+          const response = await fetch("http://localhost:5001/resumeSubmit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(resumeData),
+          });
+
+          if (!response.ok) {
+            console.error("Failed to save resume data");
+          }
+        } catch (error) {
+          console.error("Error saving resume data:", error);
+        }
+      }
+    </script>
   </body>
 </html>

@@ -9,17 +9,11 @@ const fs = require("fs");
 const bodyParser = require("body-parser");
 
 // Add this near the top of your server.js file, after your cors middleware:
-
 const app = express();
-
-// Enable CORS for specific origins
-app.use(
-  cors({
-    origin: ["http://127.0.0.1:5500", "http://localhost:5500"], // Add your frontend origins here
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
+app.use(express.json());
+app.use(cors());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
 // Optional: Add a specific route for preflight requests
 app.options("/generate-pdf", cors());
@@ -31,6 +25,7 @@ app.use(cors());
 
 // Serve static files
 app.use(express.static(path.join(__dirname, "public")));
+
 
 // Create temp directory if it doesn't exist
 const tempDir = path.join(__dirname, "temp");
@@ -63,27 +58,22 @@ const userSchema = new mongoose.Schema(
 // Define User Model
 const User = mongoose.model("User", userSchema);
 
-// Resume Schema for storing CV data
-const resumeSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    firstName: { type: String, required: true },
-    surname: { type: String, required: true },
-    city: { type: String, required: true },
-    postalCode: { type: String, required: true },
-    country: { type: String, required: true },
-    phone: { type: String, required: true },
-    email: { type: String, required: true },
-    summary: { type: String, required: true },
-    skills: { type: String, required: true },
-    experience: { type: String, required: true },
-    education: { type: String, required: true },
-    photoPath: { type: String, default: null },
-  },
-  { timestamps: true }
-);
+const ResumeBuilderSchema = new mongoose.Schema({
+  userEmail: { type: String, required: true },
+  firstname: String,
+  surname: String,
+  city: String,
+  phone: String,
+  postalcode: Number,
+  email: String,
+  password: String,
+  summary: String,
+  skills: String,
+  experience: String,
+  education: String
+}, { timestamps: true });
 
-const Resume = mongoose.model("Resume", resumeSchema);
+const ResumeBuilder = new mongoose.model("ResumeBuilder", ResumeBuilderSchema);
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -172,6 +162,68 @@ app.put("/update-profile", async (req, res) => {
   } catch (error) {
     console.error("Update profile error:", error);
     res.status(500).json({ message: "Something went wrong!" });
+  }
+});
+
+app.post("/resumeSubmit", async (req, res) => {
+  try {
+    const { email, firstname, surname, city, postalcode, phone, summary, skills, experience, education } = req.body;
+
+    console.log("Received Data:", req.body);
+    // Fetch user by email (instead of ObjectId)
+    const user = await User.findOne({ email });
+
+    console.log(user);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Prepare the resume data
+    const resumeData = {
+      userEmail: user.email,
+      firstname,
+      surname,
+      city,
+      postalcode,
+      phone,
+      email,  // User's personal email
+      summary,
+      skills,
+      experience,
+      education
+    };
+
+    // Try to find and update the resume if it exists, else create a new one
+    const updatedResume = await ResumeBuilder.findOneAndUpdate(
+      { userEmail: user.email },  // Check by user email
+      resumeData,  // Data to update or create
+      { new: true, upsert: true }  // If no document found, create a new one
+    );
+
+    res.status(200).json({ message: "Resume saved or updated successfully!", resume: updatedResume });
+
+  } catch (error) {
+    console.error("Error saving resume:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+app.get("/getResume", async (req, res) => {
+  try {
+    const { userEmail } = req.query;  // Get email from query params
+
+    // Fetch resume data using the user's email
+    const resume = await ResumeBuilder.findOne({ userEmail: userEmail });
+
+    if (!resume) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+
+    res.status(200).json(resume);
+  } catch (error) {
+    console.error("Error fetching resume:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
