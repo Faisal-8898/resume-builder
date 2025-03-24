@@ -371,12 +371,15 @@
         const userEmail = localStorage.getItem("userEmail");
         if (!userEmail) {
           console.error("No user email found in localStorage.");
-          return;
+          // Note: consider handling this error better rather than just returning
         }
 
         // Handle form submission with PDF generation
         const form = document.getElementById("cv-form");
         form.addEventListener("submit", async function (e) {
+          // IMPORTANT: Prevent the default form submission
+          e.preventDefault();
+
           // Show loading indicator
           const submitBtn = document.getElementById("submit-btn");
           const originalBtnText = submitBtn.textContent;
@@ -407,15 +410,9 @@
             };
 
             console.log("Sending PDF generation request...");
-            console.log(formData);
 
-            // FIXED: Explicitly use the correct server URL instead of assuming it's the same origin
-            // Your server is running on port 5001, not on the same port as your frontend
+            // FIXED: Explicitly use the correct server URL
             const serverUrl = "http://localhost:5001";
-
-            // Send data to backend
-            // This code goes in the form submit event listener in your frontend JavaScript
-            // Replace the PDF handling section with this improved version:
 
             // Send data to backend
             const response = await fetch(`${serverUrl}/generate-pdf`, {
@@ -471,8 +468,6 @@
                 throw new Error(`PDF download failed: ${err.message}`);
               }
             } else {
-              // Error handling code remains the same
-
               // Try to get error details
               let errorDetails = "Unknown error";
               try {
@@ -495,6 +490,7 @@
           }
         });
       });
+
       async function saveResumeData() {
         const userEmail = localStorage.getItem("userEmail");
         if (!userEmail) return;
