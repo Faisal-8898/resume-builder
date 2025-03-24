@@ -19,13 +19,12 @@ app.use(bodyParser.json());
 app.options("/generate-pdf", cors());
 
 // Middleware setup with increased limits for base64 images
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.json());
+app.use(express.urlencoded());
 app.use(cors());
 
 // Serve static files
 app.use(express.static(path.join(__dirname, "public")));
-
 
 // Create temp directory if it doesn't exist
 const tempDir = path.join(__dirname, "temp");
@@ -36,7 +35,7 @@ if (!fs.existsSync(tempDir)) {
 // MongoDB Connection
 mongoose
   .connect(
-    "mongodb+srv://sanjanakazisupti:D1yqCrFpW6Ac7Tou@cluster0.i9aqb.mongodb.net/Resume_builder"
+    "mongodb+srv://sanjanakazisupti:D1yqCrFpW6Ac7Tou@cluster0.i9aqb.mongodb.net/Resume_builder",
   )
   .then(() => console.log("✅ Connected to MongoDB"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
@@ -52,26 +51,29 @@ const userSchema = new mongoose.Schema(
     bio: { type: String, default: "" },
     skills: { type: String, default: "" },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Define User Model
 const User = mongoose.model("User", userSchema);
 
-const ResumeBuilderSchema = new mongoose.Schema({
-  userEmail: { type: String, required: true },
-  firstname: String,
-  surname: String,
-  city: String,
-  phone: String,
-  postalcode: Number,
-  email: String,
-  password: String,
-  summary: String,
-  skills: String,
-  experience: String,
-  education: String
-}, { timestamps: true });
+const ResumeBuilderSchema = new mongoose.Schema(
+  {
+    userEmail: { type: String, required: true },
+    firstname: String,
+    surname: String,
+    city: String,
+    phone: String,
+    postalcode: Number,
+    email: String,
+    password: String,
+    summary: String,
+    skills: String,
+    experience: String,
+    education: String,
+  },
+  { timestamps: true },
+);
 
 const ResumeBuilder = new mongoose.model("ResumeBuilder", ResumeBuilderSchema);
 
@@ -151,7 +153,7 @@ app.put("/update-profile", async (req, res) => {
     const updatedUser = await User.findOneAndUpdate(
       { email },
       { phone, location, bio, skills, resume },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!updatedUser) {
@@ -167,7 +169,18 @@ app.put("/update-profile", async (req, res) => {
 
 app.post("/resumeSubmit", async (req, res) => {
   try {
-    const { email, firstname, surname, city, postalcode, phone, summary, skills, experience, education } = req.body;
+    const {
+      email,
+      firstname,
+      surname,
+      city,
+      postalcode,
+      phone,
+      summary,
+      skills,
+      experience,
+      education,
+    } = req.body;
 
     console.log("Received Data:", req.body);
     // Fetch user by email (instead of ObjectId)
@@ -186,32 +199,33 @@ app.post("/resumeSubmit", async (req, res) => {
       city,
       postalcode,
       phone,
-      email,  // User's personal email
+      email, // User's personal email
       summary,
       skills,
       experience,
-      education
+      education,
     };
 
     // Try to find and update the resume if it exists, else create a new one
     const updatedResume = await ResumeBuilder.findOneAndUpdate(
-      { userEmail: user.email },  // Check by user email
-      resumeData,  // Data to update or create
-      { new: true, upsert: true }  // If no document found, create a new one
+      { userEmail: user.email }, // Check by user email
+      resumeData, // Data to update or create
+      { new: true, upsert: true }, // If no document found, create a new one
     );
 
-    res.status(200).json({ message: "Resume saved or updated successfully!", resume: updatedResume });
-
+    res.status(200).json({
+      message: "Resume saved or updated successfully!",
+      resume: updatedResume,
+    });
   } catch (error) {
     console.error("Error saving resume:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-
 app.get("/getResume", async (req, res) => {
   try {
-    const { userEmail } = req.query;  // Get email from query params
+    const { userEmail } = req.query; // Get email from query params
 
     // Fetch resume data using the user's email
     const resume = await ResumeBuilder.findOne({ userEmail: userEmail });
@@ -283,7 +297,7 @@ app.post("/generate-pdf", async (req, res) => {
     // Create a temporary file path for the PDF
     const pdfPath = path.join(
       tempDir,
-      `cv_${data.firstName}_${data.surname}_${Date.now()}.pdf`
+      `cv_${data.firstName}_${data.surname}_${Date.now()}.pdf`,
     );
 
     // Create a new PDF document
@@ -354,7 +368,7 @@ app.post("/generate-pdf", async (req, res) => {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=cv_${data.firstName}_${data.surname}.pdf`
+        `attachment; filename=cv_${data.firstName}_${data.surname}.pdf`,
       );
 
       // Read and send the file
